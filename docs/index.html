@@ -171,9 +171,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@breezystack/lamejs@1.2.7/dist/lamejs.iife.js"></script>
 <script type="module">
-import { Client } from "https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js";
-
-const SPACE = "stabilityai/stable-audio-3";
+const API_BASE = "https://stabilityai-stable-audio-3.hf.space/gradio_api/call/infer";
 const $ = (id) => document.getElementById(id);
 
 // --- login (lucchetto leggero: la pagina è pubblica, vedi GUIDA.md) ---
@@ -212,7 +210,6 @@ $("loginForm").addEventListener("submit", async (e) => {
 });
 
 const stato = $("stato"), barra = $("barra"), btn = $("genera");
-let client = null, clientToken = null;
 let wavUrl = null, mp3Blob = null, tracciaNome = "musik-maker";
 
 function fmtDur(s) {
@@ -240,20 +237,58 @@ $("salvaToken").addEventListener("click", () => {
   const t = tokenInput.value.trim();
   if (t && !t.startsWith("hf_")) { tokenStato.textContent = "Il token deve iniziare con hf_"; return; }
   if (t) { localStorage.setItem("hf_token", t); tokenStato.textContent = "Token salvato ✓"; }
-  client = null;
 });
 $("rimuoviToken").addEventListener("click", () => {
   localStorage.removeItem("hf_token"); tokenInput.value = "";
-  tokenStato.textContent = "Token rimosso"; client = null;
+  tokenStato.textContent = "Token rimosso";
 });
 
-async function getClient() {
-  const token = localStorage.getItem("hf_token") || null;
-  if (client && clientToken === token) return client;
-  const opts = token ? { hf_token: token } : {};
-  client = await Client.connect(SPACE, opts);
-  clientToken = token;
-  return client;
+// Chiamata diretta all'API dello Space (submit + stream SSE del risultato).
+async function chiamaInfer(payload, token) {
+  const auth = token ? { Authorization: "Bearer " + token } : {};
+  const sub = await fetch(API_BASE, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...auth },
+    body: JSON.stringify({ data: payload }),
+  });
+  if (!sub.ok) throw new Error("invio fallito (HTTP " + sub.status + ")");
+  const { event_id } = await sub.json();
+  if (!event_id) throw new Error("il motore non ha accettato la richiesta");
+
+  const res = await fetch(API_BASE + "/" + event_id, { headers: auth });
+  if (!res.ok) throw new Error("lettura del risultato fallita (HTTP " + res.status + ")");
+
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = "", eventName = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let idx;
+    while ((idx = buf.indexOf("\n")) >= 0) {
+      const line = buf.slice(0, idx).replace(/\r$/, "");
+      buf = buf.slice(idx + 1);
+      if (line.startsWith("event:")) {
+        eventName = line.slice(6).trim();
+      } else if (line.startsWith("data:")) {
+        const raw = line.slice(5).trim();
+        if (eventName === "error") {
+          let msg = raw;
+          try {
+            const j = JSON.parse(raw);
+            msg = (j && (j.error || j.title)) || "errore del motore";
+          } catch { /* testo grezzo */ }
+          throw new Error(msg === "null" ? "errore del motore" : msg);
+        }
+        if (eventName === "complete") {
+          return JSON.parse(raw);
+        }
+        setStato("Generazione in corso…");
+      }
+    }
+  }
+  throw new Error("il motore ha chiuso la connessione senza inviare l'audio");
 }
 
 // --- generazione ---
@@ -276,50 +311,29 @@ btn.addEventListener("click", async () => {
   mp3Blob = null; wavUrl = null;
   $("risultato").style.display = "none";
   barra.style.display = "block"; barra.removeAttribute("value");
-  setStato("Connessione al motore…");
+  setStato("Invio della richiesta al motore…");
   const t0 = Date.now();
 
   try {
-    const app = await getClient();
-    const job = app.submit("/infer", {
-      variant_key: modello.value,
-      prompt,
-      duration: secondi,
-      steps: 8,
-      cfg_scale: 1.0,
-      sampler_type: "pingpong",
-      seed,
-    });
-
-    for await (const msg of job) {
-      if (msg.type === "status") {
-        if (msg.stage === "error") {
-          throw new Error(msg.message || "errore del motore (forse quota GPU esaurita: riprova più tardi o salva un token nelle impostazioni)");
-        }
-        if (typeof msg.position === "number" && msg.position > 0) {
-          setStato(`In coda: posizione ${msg.position}` + (msg.eta ? ` — attesa stimata ${Math.round(msg.eta)}s` : ""));
-        } else if (msg.stage === "pending" || msg.stage === "generating") {
-          setStato("Generazione in corso…");
-        }
-      }
-      if (msg.type === "data") {
-        const file = msg.data && msg.data[0];
-        if (!file || !file.url) throw new Error("risposta senza file audio");
-        wavUrl = file.url;
-        const secTot = ((Date.now() - t0) / 1000).toFixed(1);
-        tracciaNome = "musik-" + (prompt.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40) || "traccia") + "-" + seed;
-        $("player").src = wavUrl;
-        $("info").textContent = `${fmtDur(secondi)} · seed ${seed} · generata in ${secTot}s`;
-        $("risultato").style.display = "block";
-        $("convStato").textContent = "";
-        setStato("Fatto! Ascolta qui sotto o scarica il file.", "ok");
-      }
-    }
-    if (!wavUrl) setStato("Il motore non ha restituito audio. Cause tipiche: quota GPU giornaliera esaurita (riprova domani) o token non valido — controlla le Impostazioni.", "err");
+    const token = localStorage.getItem("hf_token");
+    const out = await chiamaInfer(
+      [modello.value, prompt, secondi, 8, 1.0, "pingpong", seed],
+      token,
+    );
+    const file = out && out[0];
+    if (!file || !file.url) throw new Error("risposta senza file audio");
+    wavUrl = file.url;
+    const secTot = ((Date.now() - t0) / 1000).toFixed(1);
+    tracciaNome = "musik-" + (prompt.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40) || "traccia") + "-" + seed;
+    $("player").src = wavUrl;
+    $("info").textContent = `${fmtDur(secondi)} · seed ${seed} · generata in ${secTot}s`;
+    $("risultato").style.display = "block";
+    $("convStato").textContent = "";
+    setStato("Fatto! Ascolta qui sotto o scarica il file.", "ok");
   } catch (e) {
     const m = String(e.message || e);
     if (/quota|exceeded|rate ?limit/i.test(m)) {
-      setStato("Quota GPU gratuita esaurita per oggi. Salva un token Hugging Face nelle impostazioni per una quota più ampia, oppure riprova più tardi.", "err");
+      setStato("Quota GPU gratuita esaurita per ora: riprova tra qualche ora (il messaggio del motore: " + m + ")", "err");
     } else {
       setStato("Errore: " + m, "err");
     }
