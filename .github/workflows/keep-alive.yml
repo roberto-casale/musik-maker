@@ -1,0 +1,36 @@
+# Tiene sveglio lo Space gratuito (che altrimenti si addormenta dopo 48h di
+# inattivita') riavviandolo una volta al giorno.
+#
+# E' OPZIONALE: senza, lo Space si risveglia comunque da solo alla prima
+# visita, con qualche minuto di attesa. Per attivarlo, nelle impostazioni del
+# repo GitHub aggiungi:
+#   - secret  HF_TOKEN : token Hugging Face con permesso Write
+#   - variable SPACE_ID: l'ID dello Space, es. tuo-username/musik-maker
+name: Keep Space awake
+
+on:
+  schedule:
+    - cron: "23 4 * * *" # ogni giorno alle 04:23 UTC
+  workflow_dispatch: {}
+
+jobs:
+  restart:
+    runs-on: ubuntu-latest
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      SPACE_ID: ${{ vars.SPACE_ID }}
+    steps:
+      - name: Riavvia lo Space
+        if: env.HF_TOKEN != '' && env.SPACE_ID != ''
+        run: |
+          pip install --quiet huggingface_hub
+          python - <<'EOF'
+          import os
+          from huggingface_hub import HfApi
+
+          HfApi(token=os.environ["HF_TOKEN"]).restart_space(os.environ["SPACE_ID"])
+          print(f"Space {os.environ['SPACE_ID']} riavviato.")
+          EOF
+      - name: Configurazione mancante
+        if: env.HF_TOKEN == '' || env.SPACE_ID == ''
+        run: echo "HF_TOKEN (secret) o SPACE_ID (variable) non configurati - salto."
