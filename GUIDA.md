@@ -1,93 +1,71 @@
-# Guida passo-passo: mettere online Musik Maker
+# Guida a Musik Maker
 
-Tempo stimato: 15 minuti di lavoro tuo + 10–20 minuti di attesa per la build.
-Costo: **zero**.
+## Usare l'app (nessuna installazione)
 
-## 1. Crea l'account Hugging Face
+L'app è online su **https://roberto-casale.github.io/musik-maker/** e funziona
+da qualunque browser, a PC spento: la generazione avviene sui server GPU
+gratuiti di Hugging Face (Space ufficiale Stable Audio 3 di Stability AI).
 
-Vai su https://huggingface.co/join e registrati (gratuito). Hugging Face è la
-piattaforma che ospiterà l'app: gira sui loro server, quindi funziona anche a
-PC spento.
+1. Scrivi la descrizione della musica (in inglese funziona meglio),
+   es. `Calm lo-fi hip hop with warm piano, 80 BPM`.
+2. Scegli modello e durata: **medium** fino a 6:20 (consigliato),
+   **small** fino a 2:00.
+3. Premi **Genera musica**: pochi secondi e la traccia è pronta.
+4. Scarica in **MP3** (convertito nel browser) o WAV.
 
-## 2. Accetta la licenza del modello
+### Quota giornaliera e token
 
-Vai su https://huggingface.co/stabilityai/stable-audio-3-small-music da
-loggato. Vedrai un modulo ("gated model"): compila nome, email, paese e uso
-previsto, e accetta la **Stability AI Community License** (più i termini Gemma
-per il componente di testo). L'approvazione è automatica.
+La GPU gratuita ha una quota giornaliera: senza login vale per indirizzo IP
+(pochi minuti di GPU al giorno — ogni traccia ne consuma pochi secondi). Per
+una quota più ampia: crea un token **Read** su
+https://huggingface.co/settings/tokens e salvalo nelle **Impostazioni** della
+pagina. Il token resta solo nel tuo browser (localStorage) e viene inviato
+esclusivamente a Hugging Face.
 
-Questo passaggio è ciò che ti dà il diritto di **usare commercialmente la
-musica generata** (valido finché il tuo fatturato annuo resta sotto 1 M$).
-Senza questo passaggio, lo Space non riuscirà a scaricare il modello.
+### Se la generazione fallisce
 
-## 3. Crea un token di accesso
+- "Quota esaurita" → salva un token nelle impostazioni o riprova più tardi.
+- Coda lunga → lo Space ufficiale è condiviso: nei momenti di punta si aspetta
+  qualche minuto in coda.
+- Se lo Space ufficiale venisse spento da Stability, l'app va ripuntata a un
+  altro Space (una riga in `docs/index.html`, costante `SPACE`) o si passa al
+  piano B qui sotto.
 
-Vai su https://huggingface.co/settings/tokens → "Create new token" → tipo
-**Write** → dagli un nome (es. `musik-maker`) e copialo. Trattalo come una
-password: non incollarlo in file che finiscono su GitHub.
+## Piano B: Space Gradio proprio (richiede HF PRO, $9/mese)
 
-## 4. Lancia il deploy
+Il repo contiene anche l'app Python completa (`app.py`) per ospitare un
+proprio Space con il modello `stable-audio-3-small-music`. Da luglio 2026
+Hugging Face richiede l'abbonamento PRO per ospitare Space Gradio (anche su
+CPU). Con PRO attivo:
 
-Dal terminale, nella cartella del progetto:
+1. Accetta la licenza del modello su
+   https://huggingface.co/stabilityai/stable-audio-3-small-music
+2. Crea un token **Write** su https://huggingface.co/settings/tokens
+3. Dalla cartella del progetto:
 
-```bash
-pip install huggingface_hub
-python deploy.py --space TUO_USERNAME/musik-maker --token hf_xxx
-```
+   ```bash
+   pip install huggingface_hub
+   python deploy.py --space TUO_USERNAME/musik-maker --token hf_xxx
+   ```
 
-(sostituisci `TUO_USERNAME` con il tuo username Hugging Face e `hf_xxx` con il
-token). Lo script:
+   Lo script crea lo Space, imposta il secret `HF_TOKEN` e carica i file. La
+   prima build scarica ~3.5 GB di pesi (10–20 minuti). Con PRO conviene poi
+   impostare hardware **ZeroGPU** nelle Settings dello Space: la generazione
+   passa da minuti (CPU) a secondi.
 
-- crea lo Space `TUO_USERNAME/musik-maker` (SDK Gradio, hardware CPU gratuito);
-- imposta il token come secret `HF_TOKEN` dello Space (serve per scaricare il
-  modello gated);
-- carica tutti i file del progetto.
+4. (Facoltativo) Keep-alive: nel repo GitHub aggiungi il secret `HF_TOKEN` e
+   la variabile `SPACE_ID` (es. `TUO_USERNAME/musik-maker`) — l'Action inclusa
+   riavvia lo Space ogni giorno.
 
-## 5. Attendi la prima build
+## Promemoria legale (YouTube e uso commerciale)
 
-Apri `https://huggingface.co/spaces/TUO_USERNAME/musik-maker`. La prima build
-installa le dipendenze e scarica ~3.5 GB di pesi del modello: **10–20 minuti**.
-Puoi seguire i log nella scheda **Logs**. Quando lo stato diventa "Running",
-l'app è online e pubblica.
-
-## 6. Prova e misura i tempi
-
-Genera una prima traccia corta (20–30 secondi) e cronometra. Su CPU gratuita
-(2 vCPU) i tempi non sono documentati da nessuno: potrebbero essere minuti per
-traccia. Se per te è troppo lento, le alternative (a pagamento) sono:
-
-- **ZeroGPU**: abbonamento Hugging Face PRO ($9/mese), poi nello Space imposti
-  hardware ZeroGPU — genera in secondi;
-- hardware CPU/GPU dedicato a ore, sempre da Hugging Face.
-
-## 7. (Facoltativo) Tieni sveglio lo Space
-
-Lo Space gratuito si addormenta dopo 48 ore senza visite e si risveglia da
-solo alla prima visita (con qualche minuto di attesa e nuovo download del
-modello). Se vuoi evitarlo, nel repo **GitHub** vai su Settings →
-
-- **Secrets and variables → Actions → New repository secret**: nome
-  `HF_TOKEN`, valore il tuo token;
-- **Variables → New repository variable**: nome `SPACE_ID`, valore
-  `TUO_USERNAME/musik-maker`.
-
-La GitHub Action inclusa (`.github/workflows/keep-alive.yml`) riavvierà lo
-Space una volta al giorno.
-
-## 8. Aggiornamenti futuri
-
-Per modificare l'app: cambia i file, poi rilancia `python deploy.py ...` (o
-committa direttamente sul repo dello Space). Il repo GitHub e lo Space sono
-due copie separate: GitHub è la vetrina del codice, lo Space è ciò che gira.
-
-## Promemoria legale (per YouTube e uso commerciale)
-
-- La musica generata **ti appartiene** (Stability AI Community License) e puoi
-  usarla in video monetizzati e pubblicità finché fatturi meno di 1 M$/anno.
-- Su YouTube attiva l'etichetta **"contenuto generato con AI"** (non penalizza
+- La musica generata **ti appartiene** ([Stability AI Community
+  License](https://stability.ai/license)): uso commerciale libero sotto 1 M$
+  di fatturato annuo, anche in video monetizzati e pubblicità digitale.
+- Su YouTube attiva l'etichetta **«contenuto generato con AI»** (non penalizza
   la monetizzazione).
 - **Non registrare** le tracce nel Content ID e non distribuirle su
-  Spotify/Apple Music come se fossero opere protette: la musica puramente AI
-  non ha copyright.
-- Conserva i prompt e i parametri (seed) delle tracce che usi: sono la prova
-  della generazione in caso di claim errati.
+  Spotify/Apple Music come opere protette: la musica puramente AI non ha
+  copyright.
+- Conserva prompt e seed delle tracce che usi: sono la prova della
+  generazione in caso di claim errati.

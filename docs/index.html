@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Musik Maker — musica AI da un prompt</title>
+<meta name="description" content="Genera musica strumentale da un prompt testuale con Stable Audio 3 (Stability AI). Gratis, output di tua proprietà.">
+<style>
+  :root {
+    --bg: #f6f7fb; --card: #ffffff; --text: #1c2030; --muted: #5b6273;
+    --accent: #4f46e5; --accent-hover: #4338ca; --border: #e2e5ef;
+    --ok: #16a34a; --err: #dc2626;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12141c; --card: #1b1e2b; --text: #e8eaf2; --muted: #9aa1b5;
+      --accent: #6366f1; --accent-hover: #818cf8; --border: #2a2e40;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 1.9rem; margin: 8px 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 20px; margin-bottom: 16px;
+  }
+  label { display: block; font-weight: 600; margin: 14px 0 6px; }
+  label:first-child { margin-top: 0; }
+  textarea, input[type="number"], input[type="password"], select {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--border);
+    border-radius: 8px; background: var(--bg); color: var(--text);
+    font: inherit;
+  }
+  textarea { resize: vertical; min-height: 76px; }
+  .hint { color: var(--muted); font-size: .85rem; margin-top: 4px; }
+  .row { display: flex; gap: 10px; align-items: center; }
+  input[type="range"] { flex: 1; accent-color: var(--accent); }
+  .durval { min-width: 64px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  button {
+    font: inherit; font-weight: 600; border: 0; border-radius: 10px;
+    padding: 12px 22px; cursor: pointer;
+  }
+  .primary { background: var(--accent); color: #fff; width: 100%; margin-top: 18px; font-size: 1.05rem; }
+  .primary:hover { background: var(--accent-hover); }
+  .primary:disabled { opacity: .55; cursor: wait; }
+  .ghost {
+    background: transparent; color: var(--accent);
+    border: 1px solid var(--accent); padding: 9px 16px;
+  }
+  .ghost:disabled { opacity: .5; cursor: wait; }
+  #stato { margin-top: 14px; min-height: 1.4em; color: var(--muted); }
+  #stato.err { color: var(--err); }
+  #stato.ok { color: var(--ok); }
+  #risultato { display: none; }
+  audio { width: 100%; margin: 6px 0 12px; }
+  details { margin-top: 10px; }
+  summary { cursor: pointer; font-weight: 600; color: var(--muted); }
+  details[open] summary { margin-bottom: 8px; }
+  .foot { color: var(--muted); font-size: .85rem; }
+  .foot a { color: var(--accent); }
+  .badge {
+    display: inline-block; font-size: .75rem; font-weight: 600;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 20px; padding: 2px 10px; margin-left: 6px; color: var(--muted);
+  }
+  progress { width: 100%; height: 8px; margin-top: 8px; accent-color: var(--accent); display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🎵 Musik Maker</h1>
+  <p class="sub">Descrivi la musica, scegli la durata, scarica l'MP3. Strumentale, gratuita,
+     <strong>di tua proprietà</strong> anche per uso commerciale.</p>
+
+  <div class="card">
+    <label for="prompt">Descrizione della musica</label>
+    <textarea id="prompt" placeholder="Es.: Calm lo-fi hip hop with warm piano and vinyl crackle, 80 BPM"></textarea>
+    <div class="hint">In inglese funziona meglio. Indica genere, strumenti, atmosfera e magari i BPM.</div>
+
+    <label for="modello">Modello</label>
+    <select id="modello">
+      <option value="medium" data-max="380" selected>Medium — qualità migliore, fino a 6:20</option>
+      <option value="small-music" data-max="120">Small — più leggero, fino a 2:00</option>
+    </select>
+
+    <label for="durata">Durata</label>
+    <div class="row">
+      <input type="range" id="durata" min="10" max="380" step="5" value="60">
+      <span class="durval" id="durval">1:00</span>
+    </div>
+    <div class="hint">Consigliati almeno 20 secondi.</div>
+
+    <details>
+      <summary>Opzioni avanzate</summary>
+      <label for="seed">Seed <span class="badge">facoltativo</span></label>
+      <input type="number" id="seed" placeholder="vuoto = casuale">
+      <div class="hint">Con lo stesso seed, stesso prompt e stessa durata il risultato è riproducibile.</div>
+    </details>
+
+    <button class="primary" id="genera">Genera musica</button>
+    <div id="stato"></div>
+    <progress id="barra" max="100"></progress>
+  </div>
+
+  <div class="card" id="risultato">
+    <label>Traccia generata <span class="badge" id="info"></span></label>
+    <audio id="player" controls></audio>
+    <div class="row">
+      <button class="ghost" id="scaricaMp3">Scarica MP3</button>
+      <button class="ghost" id="scaricaWav">Scarica WAV</button>
+    </div>
+    <div class="hint" id="convStato"></div>
+  </div>
+
+  <div class="card">
+    <details>
+      <summary>⚙️ Impostazioni — token Hugging Face (per più generazioni al giorno)</summary>
+      <p class="hint" style="margin-top:8px">
+        La pagina funziona anche senza token, con una quota GPU gratuita giornaliera legata al tuo
+        indirizzo IP. Con un token gratuito di <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener">Hugging Face</a>
+        (tipo <em>Read</em> basta) la quota è più ampia. Il token resta <strong>solo nel tuo browser</strong>
+        (localStorage) e viene inviato esclusivamente a Hugging Face.
+      </p>
+      <label for="token">Token</label>
+      <input type="password" id="token" placeholder="hf_...">
+      <div class="row" style="margin-top:10px">
+        <button class="ghost" id="salvaToken">Salva</button>
+        <button class="ghost" id="rimuoviToken">Rimuovi</button>
+        <span class="hint" id="tokenStato"></span>
+      </div>
+    </details>
+  </div>
+
+  <p class="foot">
+    Motore: <a href="https://huggingface.co/spaces/stabilityai/stable-audio-3" target="_blank" rel="noopener">Stable Audio 3</a>
+    di Stability AI (Space ufficiale, GPU gratuita) —
+    <a href="https://stability.ai/license" target="_blank" rel="noopener">Community License</a>:
+    gli output appartengono a te, uso commerciale libero sotto 1&nbsp;M$ di fatturato annuo.
+    Ricorda: su YouTube attiva l'etichetta «contenuto generato con AI» e non registrare le tracce nel Content&nbsp;ID.
+    Codice: <a href="https://github.com/roberto-casale/musik-maker" target="_blank" rel="noopener">GitHub</a>.
+  </p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@breezystack/lamejs@1.2.7/dist/lamejs.iife.js"></script>
+<script type="module">
+import { Client } from "https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js";
+
+const SPACE = "stabilityai/stable-audio-3";
+const $ = (id) => document.getElementById(id);
+
+const stato = $("stato"), barra = $("barra"), btn = $("genera");
+let client = null, clientToken = null;
+let wavUrl = null, mp3Blob = null, tracciaNome = "musik-maker";
+
+function fmtDur(s) {
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+function setStato(msg, cls = "") { stato.textContent = msg; stato.className = cls; }
+
+// --- durata / modello ---
+const durata = $("durata"), durval = $("durval"), modello = $("modello");
+function aggiornaDurata() { durval.textContent = fmtDur(Number(durata.value)); }
+modello.addEventListener("change", () => {
+  const max = Number(modello.selectedOptions[0].dataset.max);
+  durata.max = max;
+  if (Number(durata.value) > max) durata.value = max;
+  aggiornaDurata();
+});
+durata.addEventListener("input", aggiornaDurata);
+aggiornaDurata();
+
+// --- token ---
+const tokenInput = $("token"), tokenStato = $("tokenStato");
+tokenInput.value = localStorage.getItem("hf_token") || "";
+if (tokenInput.value) tokenStato.textContent = "Token salvato ✓";
+$("salvaToken").addEventListener("click", () => {
+  const t = tokenInput.value.trim();
+  if (t && !t.startsWith("hf_")) { tokenStato.textContent = "Il token deve iniziare con hf_"; return; }
+  if (t) { localStorage.setItem("hf_token", t); tokenStato.textContent = "Token salvato ✓"; }
+  client = null;
+});
+$("rimuoviToken").addEventListener("click", () => {
+  localStorage.removeItem("hf_token"); tokenInput.value = "";
+  tokenStato.textContent = "Token rimosso"; client = null;
+});
+
+async function getClient() {
+  const token = localStorage.getItem("hf_token") || null;
+  if (client && clientToken === token) return client;
+  const opts = token ? { hf_token: token } : {};
+  client = await Client.connect(SPACE, opts);
+  clientToken = token;
+  return client;
+}
+
+// --- generazione ---
+btn.addEventListener("click", async () => {
+  const prompt = $("prompt").value.trim();
+  if (!prompt) { setStato("Scrivi prima una descrizione della musica.", "err"); return; }
+
+  const secondi = Number(durata.value);
+  const seedRaw = $("seed").value.trim();
+  const seed = seedRaw === "" ? Math.floor(Math.random() * 2147483647) : Number(seedRaw);
+
+  btn.disabled = true;
+  mp3Blob = null; wavUrl = null;
+  $("risultato").style.display = "none";
+  barra.style.display = "block"; barra.removeAttribute("value");
+  setStato("Connessione al motore…");
+  const t0 = Date.now();
+
+  try {
+    const app = await getClient();
+    const job = app.submit("/infer", {
+      variant_key: modello.value,
+      prompt,
+      duration: secondi,
+      steps: 8,
+      cfg_scale: 1.0,
+      sampler_type: "pingpong",
+      seed,
+    });
+
+    for await (const msg of job) {
+      if (msg.type === "status") {
+        if (msg.stage === "error") {
+          throw new Error(msg.message || "errore del motore (forse quota GPU esaurita: riprova più tardi o salva un token nelle impostazioni)");
+        }
+        if (typeof msg.position === "number" && msg.position > 0) {
+          setStato(`In coda: posizione ${msg.position}` + (msg.eta ? ` — attesa stimata ${Math.round(msg.eta)}s` : ""));
+        } else if (msg.stage === "pending" || msg.stage === "generating") {
+          setStato("Generazione in corso…");
+        }
+      }
+      if (msg.type === "data") {
+        const file = msg.data && msg.data[0];
+        if (!file || !file.url) throw new Error("risposta senza file audio");
+        wavUrl = file.url;
+        const secTot = ((Date.now() - t0) / 1000).toFixed(1);
+        tracciaNome = "musik-" + (prompt.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40) || "traccia") + "-" + seed;
+        $("player").src = wavUrl;
+        $("info").textContent = `${fmtDur(secondi)} · seed ${seed} · generata in ${secTot}s`;
+        $("risultato").style.display = "block";
+        $("convStato").textContent = "";
+        setStato("Fatto! Ascolta qui sotto o scarica il file.", "ok");
+      }
+    }
+    if (!wavUrl) setStato("Nessun audio ricevuto: riprova.", "err");
+  } catch (e) {
+    const m = String(e.message || e);
+    if (/quota|exceeded|rate ?limit/i.test(m)) {
+      setStato("Quota GPU gratuita esaurita per oggi. Salva un token Hugging Face nelle impostazioni per una quota più ampia, oppure riprova più tardi.", "err");
+    } else {
+      setStato("Errore: " + m, "err");
+    }
+  } finally {
+    btn.disabled = false;
+    barra.style.display = "none";
+  }
+});
+
+// --- download ---
+function scarica(blob, nome) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = nome;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+}
+
+$("scaricaWav").addEventListener("click", async () => {
+  if (!wavUrl) return;
+  $("convStato").textContent = "Download WAV…";
+  const blob = await (await fetch(wavUrl)).blob();
+  scarica(blob, tracciaNome + ".wav");
+  $("convStato").textContent = "";
+});
+
+$("scaricaMp3").addEventListener("click", async () => {
+  if (!wavUrl) return;
+  const b = $("scaricaMp3");
+  b.disabled = true;
+  try {
+    if (!mp3Blob) {
+      $("convStato").textContent = "Conversione in MP3 nel browser… (per tracce lunghe può volerci qualche secondo)";
+      const buf = await (await fetch(wavUrl)).arrayBuffer();
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const audio = await ctx.decodeAudioData(buf);
+      const sr = audio.sampleRate;
+      const ch = Math.min(audio.numberOfChannels, 2);
+      const toInt16 = (f32) => {
+        const out = new Int16Array(f32.length);
+        for (let i = 0; i < f32.length; i++) {
+          const v = Math.max(-1, Math.min(1, f32[i]));
+          out[i] = v < 0 ? v * 32768 : v * 32767;
+        }
+        return out;
+      };
+      const left = toInt16(audio.getChannelData(0));
+      const right = ch > 1 ? toInt16(audio.getChannelData(1)) : left;
+      const enc = new lamejs.Mp3Encoder(2, sr, 192);
+      const parti = [], blocco = 1152;
+      for (let i = 0; i < left.length; i += blocco) {
+        const d = enc.encodeBuffer(left.subarray(i, i + blocco), right.subarray(i, i + blocco));
+        if (d.length) parti.push(d);
+      }
+      const fine = enc.flush();
+      if (fine.length) parti.push(fine);
+      mp3Blob = new Blob(parti, { type: "audio/mpeg" });
+      ctx.close();
+    }
+    scarica(mp3Blob, tracciaNome + ".mp3");
+    $("convStato").textContent = "";
+  } catch (e) {
+    $("convStato").textContent = "Conversione MP3 fallita (" + (e.message || e) + "): usa il WAV.";
+  } finally {
+    b.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

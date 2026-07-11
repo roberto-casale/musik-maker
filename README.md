@@ -18,50 +18,45 @@ models:
 
 # 🎵 Musik Maker
 
-Genera musica strumentale da un prompt testuale e scaricala in MP3.
-Frontend Gradio + modello open-weight
-[stable-audio-3-small-music](https://huggingface.co/stabilityai/stable-audio-3-small-music)
-di Stability AI, in esecuzione su uno Space Hugging Face gratuito (CPU).
+Genera musica strumentale da un prompt testuale e scaricala in MP3 — gratis,
+con output **di tua proprietà** anche per uso commerciale (video YouTube
+monetizzati, spot, ecc., sotto 1 M$ di fatturato annuo).
+
+**▶️ App online: https://roberto-casale.github.io/musik-maker/**
 
 ## Come funziona
 
-1. Scrivi un prompt che descrive la musica (in inglese funziona meglio),
-   es. `Calm lo-fi hip hop with warm piano, 80 BPM`.
-2. Scegli la durata (10–120 secondi).
-3. Premi **Genera** e scarica l'MP3.
+La pagina (statica, su GitHub Pages) chiama via API lo
+[Space ufficiale Stable Audio 3](https://huggingface.co/spaces/stabilityai/stable-audio-3)
+di Stability AI, che gira su GPU gratuite (ZeroGPU). Nessun server proprio,
+nessuna chiave nel codice: la generazione usa la quota GPU gratuita
+giornaliera del visitatore (anonima per IP, più ampia salvando un proprio
+token Hugging Face nelle impostazioni della pagina — resta nel browser).
 
-Sulla CPU gratuita la generazione può richiedere diversi minuti; la coda e
-l'avanzamento sono mostrati nella pagina.
+- Modelli: **medium** (fino a 6:20, qualità migliore) e **small** (fino a 2:00).
+- Output: WAV dal motore, **MP3 convertito direttamente nel browser**.
+- Generazione tipica: pochi secondi.
 
-## Deploy del tuo Space (riassunto)
+## Struttura del repo
 
-Istruzioni complete in [GUIDA.md](GUIDA.md). In breve:
-
-1. Account Hugging Face (gratuito).
-2. Accetta la licenza sulla
-   [pagina del modello](https://huggingface.co/stabilityai/stable-audio-3-small-music)
-   (il repo è *gated*: senza questo passaggio il download fallisce).
-3. Crea un [token di accesso](https://huggingface.co/settings/tokens) di tipo
-   **Write**.
-4. Dalla cartella del progetto:
-
-   ```bash
-   pip install huggingface_hub
-   python deploy.py --space TUO_USERNAME/musik-maker --token hf_xxx
-   ```
-
-   Lo script crea lo Space, imposta il secret `HF_TOKEN` e carica i file.
-   Il primo avvio scarica ~3.5 GB di pesi: attendi 10–20 minuti.
+- [docs/index.html](docs/index.html) — l'app web (tutto in un file: UI, chiamata
+  API via `@gradio/client`, conversione MP3 con lamejs).
+- [app.py](app.py) + [requirements.txt](requirements.txt) +
+  [deploy.py](deploy.py) — **piano B**: la stessa app come Space Gradio
+  self-hosted con `stable-audio-3-small-music`. Pronta e revisionata, ma da
+  luglio 2026 ospitare uno Space Gradio proprio richiede Hugging Face PRO
+  ($9/mese); istruzioni in [GUIDA.md](GUIDA.md).
+- [.github/workflows/keep-alive.yml](.github/workflows/keep-alive.yml) —
+  keep-alive giornaliero dello Space (solo per il piano B, inattivo senza
+  secret).
 
 ## Licenza della musica generata
 
-Il modello è distribuito con la
-[Stability AI Community License](https://stability.ai/license): **gli output
-appartengono a te** e l'uso commerciale (video YouTube monetizzati, spot,
-ecc.) è consentito finché il fatturato annuo resta sotto 1 M$. Il modello è
-addestrato solo su dati licenziati o Creative Commons. Nota: la musica
-puramente generata da AI non è coperta da copyright — non registrarla nel
-Content ID e ricorda l'etichetta "contenuto generato con AI" su YouTube.
+Modello distribuito con la
+[Stability AI Community License](https://stability.ai/license): gli output
+appartengono a chi li genera, uso commerciale libero sotto 1 M$ di fatturato
+annuo, addestramento su dati interamente licenziati. La musica puramente
+generata da AI non è coperta da copyright: non registrarla nel Content ID e
+usa l'etichetta «contenuto generato con AI» su YouTube.
 
-Il codice di questo progetto è rilasciato sotto licenza MIT (vedi
-[LICENSE](LICENSE)).
+Codice del progetto: licenza MIT ([LICENSE](LICENSE)).
