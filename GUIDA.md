@@ -22,6 +22,26 @@ https://huggingface.co/settings/tokens e salvalo nelle **Impostazioni** della
 pagina. Il token resta solo nel tuo browser (localStorage) e viene inviato
 esclusivamente a Hugging Face.
 
+### Login e cambio password
+
+La pagina chiede un accesso all'apertura. Nota bene: essendo una pagina
+statica con codice pubblico, è un **lucchetto leggero** — tiene fuori i
+visitatori casuali, ma non è una vera protezione (nulla di sensibile è
+comunque custodito nella pagina). La password non è scritta in chiaro nel
+codice: c'è solo il suo hash SHA-256.
+
+Per cambiare le credenziali:
+
+1. Apri la pagina, fai login, poi apri la console del browser
+   (tasto destro → Ispeziona → Console).
+2. Esegui: `await mmHash("nuovoutente", "nuovapassword")` e copia la stringa
+   risultante.
+3. Su GitHub apri `docs/index.html` (matita per modificare), trova la riga
+   `const AUTH_HASH = "..."` e incolla la nuova stringa tra le virgolette.
+4. Salva (commit): dopo ~1 minuto la pagina usa le nuove credenziali.
+   L'accesso resta memorizzato nel browser; sugli altri dispositivi verrà
+   richiesto il nuovo login.
+
 ### Se la generazione fallisce
 
 - "Quota esaurita" → salva un token nelle impostazioni o riprova più tardi.
