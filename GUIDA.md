@@ -13,14 +13,17 @@ gratuiti di Hugging Face (Space ufficiale Stable Audio 3 di Stability AI).
 3. Premi **Genera musica**: pochi secondi e la traccia è pronta.
 4. Scarica in **MP3** (convertito nel browser) o WAV.
 
-### Quota giornaliera e token
+### Token (necessario) e quota giornaliera
 
-La GPU gratuita ha una quota giornaliera: senza login vale per indirizzo IP
-(pochi minuti di GPU al giorno — ogni traccia ne consuma pochi secondi). Per
-una quota più ampia: crea un token **Read** su
-https://huggingface.co/settings/tokens e salvalo nelle **Impostazioni** della
-pagina. Il token resta solo nel tuo browser (localStorage) e viene inviato
-esclusivamente a Hugging Face.
+Il motore GPU gratuito richiede un account Hugging Face: le chiamate anonime
+hanno quota zero. Una volta sola: crea un account gratuito su
+https://huggingface.co/join, poi un token di tipo **Read** su
+https://huggingface.co/settings/tokens, e salvalo nelle **Impostazioni**
+della pagina. Il token resta solo nel tuo browser (localStorage) e viene
+inviato esclusivamente a Hugging Face.
+
+La quota GPU gratuita è di alcuni minuti al giorno; ogni traccia ne consuma
+pochi secondi, quindi bastano per decine di generazioni quotidiane.
 
 ### Login e cambio password
 
