@@ -73,6 +73,7 @@
     position: fixed; inset: 0; z-index: 100; background: var(--bg);
     display: flex; align-items: center; justify-content: center; padding: 16px;
   }
+  #loginOverlay[hidden] { display: none !important; }
   #loginOverlay .card { width: 100%; max-width: 360px; }
   #loginErr { color: var(--err); font-size: .9rem; min-height: 1.3em; margin-top: 8px; }
 </style>
@@ -84,7 +85,7 @@
     <p class="sub" style="margin-bottom:16px">Accedi per continuare</p>
     <form id="loginForm">
       <label for="loginUser">Nome utente</label>
-      <input type="text" id="loginUser" autocomplete="username" required>
+      <input type="text" id="loginUser" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required>
       <label for="loginPass">Password</label>
       <input type="password" id="loginPass" autocomplete="current-password" required>
       <button class="primary" type="submit">Entra</button>
@@ -180,7 +181,8 @@ const $ = (id) => document.getElementById(id);
 const AUTH_HASH = "c53de622923d3897a097ff75b862e0102ce2597c8000b782a457bee4a68b1886";
 
 async function mmHash(user, pass) {
-  const data = new TextEncoder().encode(`${user}:${pass}`);
+  // nome utente insensibile alle maiuscole (i telefoni capitalizzano da soli)
+  const data = new TextEncoder().encode(`${String(user).trim().toLowerCase()}:${pass}`);
   const h = await crypto.subtle.digest("SHA-256", data);
   return [...new Uint8Array(h)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
@@ -193,13 +195,17 @@ if (localStorage.getItem("mm_auth") !== AUTH_HASH) {
 }
 $("loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const h = await mmHash($("loginUser").value.trim(), $("loginPass").value);
-  if (h === AUTH_HASH) {
-    localStorage.setItem("mm_auth", h);
-    overlay.hidden = true;
-  } else {
-    $("loginErr").textContent = "Credenziali errate.";
-    $("loginPass").value = "";
+  try {
+    const h = await mmHash($("loginUser").value, $("loginPass").value);
+    if (h === AUTH_HASH) {
+      localStorage.setItem("mm_auth", h);
+      overlay.hidden = true;
+    } else {
+      $("loginErr").textContent = "Credenziali errate.";
+      $("loginPass").value = "";
+    }
+  } catch (err) {
+    $("loginErr").textContent = "Errore del browser: " + (err.message || err);
   }
 });
 
