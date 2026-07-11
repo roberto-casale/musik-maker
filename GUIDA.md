@@ -25,6 +25,13 @@ inviato esclusivamente a Hugging Face.
 La quota GPU gratuita è di alcuni minuti al giorno; ogni traccia ne consuma
 pochi secondi, quindi bastano per decine di generazioni quotidiane.
 
+**Link personale (token automatico):** puoi salvare nei preferiti un link del
+tipo `https://TUO-SITO/#token=hf_xxx` — aprendolo, la pagina salva il token da
+sola e lo rimuove dalla barra degli indirizzi. Il fragment (`#...`) non viene
+mai inviato ad alcun server: resta nel browser. Tratta quel link come una
+password (non condividerlo e non scriverlo nel repo: GitHub revoca
+automaticamente i token `hf_` trovati nei repository pubblici).
+
 ### Login e cambio password
 
 La pagina chiede un accesso all'apertura. Nota bene: essendo una pagina

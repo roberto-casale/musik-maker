@@ -230,6 +230,16 @@ durata.addEventListener("input", aggiornaDurata);
 aggiornaDurata();
 
 // --- token ---
+// Link personale: aprendo la pagina con #token=hf_xxx il token viene salvato
+// da solo nel browser. Il fragment (#...) non viene mai inviato al server e
+// viene subito rimosso dalla barra degli indirizzi.
+const frammento = new URLSearchParams(location.hash.slice(1));
+const tokenDaLink = frammento.get("token");
+if (tokenDaLink && tokenDaLink.startsWith("hf_")) {
+  localStorage.setItem("hf_token", tokenDaLink.trim());
+  history.replaceState(null, "", location.pathname + location.search);
+}
+
 const tokenInput = $("token"), tokenStato = $("tokenStato");
 tokenInput.value = localStorage.getItem("hf_token") || "";
 if (tokenInput.value) tokenStato.textContent = "Token salvato ✓";
